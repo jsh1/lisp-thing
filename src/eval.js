@@ -4,7 +4,6 @@
 
 var Msymbol = require('./symbol.js');
 var Mcons = require('./cons.js');
-var Mlist = require('./list.js');
 var Mthrow = require('./throw.js');
 
 var symbolp = Msymbol['symbol?'];
@@ -18,64 +17,77 @@ var cadr = Mcons.cadr;
 var cddr = Mcons.cddr;
 var caddr = Mcons.caddr;
 var cdddr = Mcons.cdddr;
-var assq = Mlist.assq;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
 var signal_invalid_lambda = Mthrow['signal-invalid-lambda'];
 
-// depends on the definitions in runtime.js
+function lazy_eval(form, env, tail_posn) {
+  while (true) {
+    form = macroexpand(form, env);
 
-function eval_form(form, env) {
-  form = macroexpand(form, env);
-  if (symbolp(form)) {
-    return env_ref(env, form);
-  } else if (pairp(form)) {
-    var fun = car(form);
+    if (symbolp(form)) {
+      return env_ref(env, form);
+    } else if (!pairp(form)) {
+      return form;
+    }
+
+    var fun = form.car;
+    form = form.cdr;
+
     if (symbolp(fun)) {
       var value;
       switch (fun.sym) {
       case 'set!':
-	value = eval_form(caddr(form), env);
-	return env_set(env, cadr(form), value);
+	return env_set(env, car(form), force_eval(cadr(form), env));
       case 'quote':
 	return cadr(form);
       case 'lambda':
-	return new Lambda(cadr(form), cddr(form), env);
+	return new Lambda(car(form), cdr(form), env);
       case 'if':
-	value = eval_form(cadr(form), env);
+	value = force_eval(car(form), env);
 	if (!(value === false || value === null || value === undefined)) {
-	  value = eval_form(caddr(form), env);
+	  form = cadr(form);
+	  continue;
 	} else {
-	  value = progn(cdddr(form), env);
+	  form = cddr(form);
+	  while (pairp(cdr(form))) {
+	    force_eval(form.car, env);
+	    form = form.cdr;
+	  }
+	  form = car(form);
+          continue;
 	}
-	return value;
+	// not reached
       }
     }
-    return eval_form(car(form), env).apply(null, eval_vec(cdr(form), env));
-  } else {
-    return form;
+
+    fun = force_eval(fun, env);
+
+    var argv = [];
+    while (pairp(form)) {
+      argv.push(force_eval(form.car, env));
+      form = form.cdr;
+    }
+
+    if (tail_posn) {
+      return new TailCall(fun, argv);
+    } else {
+      return fun.apply(null, argv);
+    }
   }
+
+  // not reached
 }
 
-function macroexpand(form, env) {
-  return form;
-}
-
-function progn(lst, env) {
-  var value = null;
-  while (pairp(lst)) {
-    value = eval_form(lst.car, env);
-    lst = lst.cdr;
+function force_eval(form, env) {
+  var value = lazy_eval(form, env, false);
+  if (value instanceof TailCall) {
+    value = value.invoke();
   }
   return value;
 }
 
-function eval_vec(lst, env) {
-  var vec = [];
-  while (pairp(lst)) {
-    vec.push(eval_form(lst.car, env));
-    lst = lst.cdr;
-  }
-  return vec;
+function macroexpand(form, env) {
+  return form;
 }
 
 function env_ref(env, sym) {
@@ -118,7 +130,12 @@ function Lambda(args, body, env) {
 }
 
 Lambda.prototype.apply = function(unused, argv) {
-  return progn(this.body, this.bind_argv(argv));
+  var lst = this.body;
+  while (pairp(cdr(lst))) {
+    force_eval(lst.car, this.env);
+    lst = lst.cdr;
+  }
+  return lazy_eval(car(lst), this.env, true);
 };
 
 var Qoptional = string_to_symbol('#!optional');
@@ -178,7 +195,7 @@ Lambda.prototype.bind_argv = function(argv) {
 	if (argv_i < argv.length) {
 	  value = argv[argv_i++];
 	} else {
-	  value = eval_form(cadr(param), env);
+	  value = force_eval(cadr(param), env);
 	}
       } else {
 	signal_invalid_lambda(this.args, param);
@@ -217,7 +234,7 @@ Lambda.prototype.bind_argv = function(argv) {
 	  continue;
 	}
       }
-      value = def === null ? null : eval_form(def, env);
+      value = def === null ? null : force_eval(def, env);
       env = env_push(env, param, value);
       continue;
     case 3: // rest
@@ -256,6 +273,15 @@ Lambda.prototype.bind_argv = function(argv) {
   return env;
 };
 
+function TailCall(fun, argv) {
+  this.fun = fun;
+  this.argv = argv;
+}
+
+TailCall.prototype.invoke = function() {
+  return this.fun.apply(null, this.argv);
+};
+
 module.exports = {
-  eval: eval_form
+  eval: force_eval
 };

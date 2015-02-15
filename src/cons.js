@@ -3,8 +3,10 @@
 'use strict';
 
 var Mequality = require('./equality.js');
+var Mthrow = require('./throw.js');
 
 var equal = Mequality['equal?'];
+var check_arg = Mthrow['check-arg'];
 
 function LispCons(a, b) {
   this.car = a; this.cdr = b;
@@ -32,10 +34,12 @@ function cdr(a) {
 }
 
 function set_car(a, b) {
+  check_arg(a, pairp);
   a.car = b;
 }
 
 function set_cdr(a, b) {
+  check_arg(a, pairp);
   a.cdr = b;
 }
 
