@@ -17,6 +17,35 @@ LispCons.prototype.equal = function(a) {
     equal(this.car, a.car) && equal(this.cdr, a.cdr);
 };
 
+LispCons.prototype.print = function(print, stream, level, opts) {
+  var max_length = opts['max-length'] || Infinity;
+
+  stream.puts('(');
+
+  var obj = this;
+  var i = 0;
+
+  while(pairp(obj.cdr)) {
+    if (i++ > max_length) {
+      stream.puts('...');
+      break;
+    }
+    print(obj.car, stream, level + 1, opts);
+    obj = cdr(obj);
+    stream.puts(' ');
+  }
+
+  if (i++ < max_length) {
+    print(car(obj), stream, level + 1, opts);
+    if (cdr(obj) !== null) {
+      stream.puts(' . ');
+      print(cdr(obj), stream, level + 1, opts);
+    }
+  }
+
+  stream.puts(')');
+};
+
 function pairp(a) {
   return a instanceof LispCons;
 }

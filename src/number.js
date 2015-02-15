@@ -279,11 +279,16 @@ function min() {
 }
 
 function string_to_number(str, radix) {
-  // FIXME: implement
+  if (!radix) {
+    return Number.parseFloat(str);
+  } else {
+    return Number.parseInt(str, radix);
+  }
 }
 
 function number_to_string(a, radix) {
-  // FIXME: implement
+  check_arg(a, numberp);
+  return Number.toString(a, radix || 10);
 }
 
 module.exports = {

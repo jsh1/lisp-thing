@@ -200,7 +200,7 @@ function read_string(stream) {
 
 function read_string_escape(stream) {
   var c = stream.getc()|0;
-  var value;
+  var value, c1, c2, c3, c4;
   switch (c) {
   case -1:
     signal_end_of_stream(stream, true);
@@ -235,32 +235,38 @@ function read_string_escape(stream) {
   case 53: // '5'
   case 54: // '6'
   case 55: // '7'
-    value = c - 48;
-    while (true) {
-      c = stream.getc()|0;
-      if (c >= 48 && c <= 55) {
-        value = value * 8 + (c - 48);
-      } else {
-        stream.ungetc();
-        return value;
-      }
+    c1 = stream.getc()|0;
+    c2 = stream.getc()|0;
+    if (octal_digit(c1) && octal_digit(c2)) {
+      value = octal_digit(c) * 64 + octal_digit(c1) * 8 + octal_digit(c2);
+    } else {
+      signal_read_syntax(stream);
     }
     // not reached
     break;
   case 120: // 'x'
     value = 0;
-    while (true) {
-      c = stream.getc()|0;
-      if (c >= 48 && c <= 59) {
-        value = value * 16 + (c - 48);
-      } else if (c >= 65 && c <= 70) {
-        value = value * 16 + (c - 55);
-      } else if (c >= 97 && c <= 102) {
-        value = value * 16 + (c - 87);
-      } else {
-        stream.ungetc();
-        return value;
-      }
+    c1 = stream.getc()|0;
+    c2 = stream.getc()|0;
+    if (is_hex_digit(c1) && is_hex_digit(c2)) {
+      value = hex_digit(c1) * 16 + hex_digit(c2);
+    } else {
+      signal_read_syntax(stream);
+    }
+    // not reached
+    break;
+  case 120: // 'u'
+    value = 0;
+    c1 = stream.getc()|0;
+    c2 = stream.getc()|0;
+    c3 = stream.getc()|0;
+    c4 = stream.getc()|0;
+    if (is_hex_digit(c1) && is_hex_digit(c2) &&
+	is_hex_digit(c3) && is_hex_digit(c3)) {
+      value = (hex_digit(c1) * 4096 + hex_digit(c2) * 256 +
+	       hex_digit(c3) * 16 + hex_digit(c4));
+    } else {
+      signal_read_syntax(stream);
     }
     // not reached
     break;
@@ -463,7 +469,7 @@ function read_atom(stream, c, allow_number) {
                 radix = 0;
               }
             } else if (radix === 16) {
-              if (!ishexdigit(c)) {
+              if (!is_hex_digit(c)) {
                 radix = 0;
               }
             }
@@ -528,9 +534,36 @@ function isalpha(c) {
   return (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 }
 
-function ishexdigit(c) {
+function is_octal_digit(c) {
+  c |= 0;
+  return c >= 48 && c <= 55;
+}
+
+function octal_digit(c) {
+  c |= 0;
+  if (c >= 48 && c <= 55) {
+    return c - 48;
+  } else {
+    return -1;
+  }
+}
+
+function is_hex_digit(c) {
   c |= 0;
   return (c >= 48 && c <= 57) || (c >= 97 && c <= 102) || (c >= 65 && c <= 70);
+}
+
+function hex_digit(c) {
+  c |= 0;
+  if (c >= 48 && c <= 57) {
+    return c - 48;
+  } else if (c >= 97 && c <= 102) {
+    return 10 + c - 97;
+  } else if (c >= 65 && c <= 70) {
+    return 10 + c - 65;
+  } else {
+    return -1;
+  }
 }
 
 function isdelim(c) {
