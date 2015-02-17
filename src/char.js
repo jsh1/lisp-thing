@@ -2,8 +2,8 @@
 
 'use strict';
 
-var Mnumber = require('./src/number.js');
-var Mthrow = require('./src/throw.js');
+var Mnumber = require('./number.js');
+var Mthrow = require('./throw.js');
 
 var integerp = Mnumber['integer?'];
 var check_arg = Mthrow['check-arg'];
