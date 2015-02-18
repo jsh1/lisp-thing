@@ -1,4 +1,24 @@
-// -*- c-style: fb; indent-tabs-mode: nil -*-
+/* Copyright (c) 2015 John Harper <jsh@unfactored.org>
+
+   Permission is hereby granted, free of charge, to any person
+   obtaining a copy of this software and associated documentation files
+   (the "Software"), to deal in the Software without restriction,
+   including without limitation the rights to use, copy, modify, merge,
+   publish, distribute, sublicense, and/or sell copies of the Software,
+   and to permit persons to whom the Software is furnished to do so,
+   subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE. */
 
 'use strict';
 
@@ -62,7 +82,7 @@ function read_form(stream, nested) {
       switch (c) {
       case -1:
         signal_end_of_stream(stream, nested);
-	break;
+        break;
       case 40: // '('
         return read_vector(stream, 41);
       case 124: // '|'
@@ -82,7 +102,7 @@ function read_form(stream, nested) {
         return false;
       default:
         signal_read_syntax(stream);
-	break;
+        break;
       case 98: // 'b'
       case 66: // 'B'
       case 111: // 'o'
@@ -199,7 +219,7 @@ function read_string(stream) {
 
 function read_string_escape(stream) {
   var c = stream.getc()|0;
-  var value, c1, c2, c3, c4;
+  var c1, c2, c3, c4;
   switch (c) {
   case -1:
     signal_end_of_stream(stream, true);
@@ -237,33 +257,31 @@ function read_string_escape(stream) {
     c1 = stream.getc()|0;
     c2 = stream.getc()|0;
     if (octal_digit(c1) && octal_digit(c2)) {
-      value = octal_digit(c) * 64 + octal_digit(c1) * 8 + octal_digit(c2);
+      return octal_digit(c) * 64 + octal_digit(c1) * 8 + octal_digit(c2);
     } else {
       signal_read_syntax(stream);
     }
     // not reached
     break;
   case 120: // 'x'
-    value = 0;
     c1 = stream.getc()|0;
     c2 = stream.getc()|0;
     if (is_hex_digit(c1) && is_hex_digit(c2)) {
-      value = hex_digit(c1) * 16 + hex_digit(c2);
+      return hex_digit(c1) * 16 + hex_digit(c2);
     } else {
       signal_read_syntax(stream);
     }
     // not reached
     break;
   case 120: // 'u'
-    value = 0;
     c1 = stream.getc()|0;
     c2 = stream.getc()|0;
     c3 = stream.getc()|0;
     c4 = stream.getc()|0;
     if (is_hex_digit(c1) && is_hex_digit(c2) &&
-	is_hex_digit(c3) && is_hex_digit(c3)) {
-      value = (hex_digit(c1) * 4096 + hex_digit(c2) * 256 +
-	       hex_digit(c3) * 16 + hex_digit(c4));
+        is_hex_digit(c3) && is_hex_digit(c3)) {
+      return (hex_digit(c1) * 4096 + hex_digit(c2) * 256 +
+	      hex_digit(c3) * 16 + hex_digit(c4));
     } else {
       signal_read_syntax(stream);
     }
@@ -310,9 +328,9 @@ function read_char(stream) {
           if (c !== -1 && !isdelim(c)) {
             signal_read_syntax(stream);
           }
-	  if (c !== -1) {
-	    stream.ungetc();
-	  }
+          if (c !== -1) {
+            stream.ungetc();
+          }
           return char_map[char_name];
         } else if (c === -1 || tolower(c) !== char_name.charCodeAt(char_i)) {
           signal_read_syntax(stream);
@@ -395,7 +413,7 @@ function read_atom(stream, c, allow_number) {
           expecting_prefix = false;
           ifirst = buffer.length + 1;
         } else if (buffer.length === ifirst &&
-		   (c === 45 || c === 43 || c === 35)) {
+                   (c === 45 || c === 43 || c === 35)) {
           // '-' || '+' || '#'
           if (c === 35) {
             if (had_sign) {

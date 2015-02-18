@@ -1,4 +1,24 @@
-// -*- c-style: fb; indent-tabs-mode: nil -*-
+/* Copyright (c) 2015 John Harper <jsh@unfactored.org>
+
+   Permission is hereby granted, free of charge, to any person
+   obtaining a copy of this software and associated documentation files
+   (the "Software"), to deal in the Software without restriction,
+   including without limitation the rights to use, copy, modify, merge,
+   publish, distribute, sublicense, and/or sell copies of the Software,
+   and to permit persons to whom the Software is furnished to do so,
+   subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE. */
 
 'use strict';
 
@@ -17,8 +37,12 @@ var cadr = Mcons.cadr;
 var cddr = Mcons.cddr;
 var caddr = Mcons.caddr;
 var cdddr = Mcons.cdddr;
+var list = Mcons.list;
+var signal = Mthrow.signal;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
-var signal_invalid_lambda = Mthrow['signal-invalid-lambda'];
+
+var Qinvalid_lambda = string_to_symbol('invalid-lambda');
+var Qunbound_variable = string_to_symbol('unbound-variable');
 
 function lazy_eval(form, env, tail_posn) {
   while (true) {
@@ -37,26 +61,27 @@ function lazy_eval(form, env, tail_posn) {
       var value;
       switch (fun.sym) {
       case 'set!':
-	return env_set(env, car(form), force_eval(cadr(form), env));
+        return env_set(env, car(form), force_eval(cadr(form), env));
       case 'quote':
-	return cadr(form);
+        return car(form);
       case 'lambda':
-	return new Lambda(car(form), cdr(form), env);
+        return new Lambda(car(form), cdr(form), env);
       case 'if':
-	value = force_eval(car(form), env);
-	if (!(value === false || value === null || value === undefined)) {
-	  form = cadr(form);
-	  continue;
-	} else {
-	  form = cddr(form);
-	  while (pairp(cdr(form))) {
-	    force_eval(form.car, env);
-	    form = form.cdr;
-	  }
-	  form = car(form);
+        value = force_eval(car(form), env);
+        form = cdr(form);
+        if (!(value === false || value === null || value === undefined)) {
+          form = car(form);
           continue;
-	}
-	// not reached
+        } else {
+          form = cdr(form);
+          while (pairp(cdr(form))) {
+            force_eval(form.car, env);
+            form = form.cdr;
+          }
+          form = car(form);
+          continue;
+        }
+        // not reached
       }
     }
 
@@ -99,10 +124,11 @@ function env_ref(env, sym) {
     env = env.cdr;
   }
   // alist can be dotted to object with global env
-  if (env) {
-    return env[sym.sym];
+  var value = env ? env[sym.sym] : undefined;
+  if (value !== undefined) {
+    return value;
   } else {
-    return undefined;
+    signal(list(Qunbound_variable, sym));
   }
 }
 
@@ -116,6 +142,8 @@ function env_set(env, sym, value) {
   }
   if (env && env.hasOwnProperty(sym.sym)) {
     env[sym.sym] = value;
+  } else {
+    signal(list(Qunbound_variable, sym));
   }
 }
 
@@ -135,7 +163,7 @@ Lambda.prototype.apply = function(unused, argv) {
     force_eval(lst.car, this.env);
     lst = lst.cdr;
   }
-  return lazy_eval(car(lst), this.env, true);
+  return lazy_eval(car(lst), this.bind_argv(argv), true);
 };
 
 var Qoptional = string_to_symbol('#!optional');
@@ -155,101 +183,101 @@ Lambda.prototype.bind_argv = function(argv) {
     switch (state) {
     case 0: // required
       if (symbolp(param)) {
-	if (param == Qoptional) {
-	  state = 1;
-	  continue;
-	} else if (param == Qkey) {
-	  state = 2;
-	  continue;
-	} else if (param == Qrest) {
-	  state = 3;
-	  continue;
-	} else {
-	  if (argv_i >= argv.length) {
-	    signal_missing_arg(argv_i);
-	  }
-	  sym = param;
-	  value = argv[argv_i++];
-	}
+        if (param == Qoptional) {
+          state = 1;
+          continue;
+        } else if (param == Qkey) {
+          state = 2;
+          continue;
+        } else if (param == Qrest) {
+          state = 3;
+          continue;
+        } else {
+          if (argv_i >= argv.length) {
+            signal_missing_arg(argv_i);
+          }
+          sym = param;
+          value = argv[argv_i++];
+        }
       } else {
-	signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(this.args, param);
       }
       env = env_push(env, sym, value);
       continue;
     case 1: // optional
       if (symbolp(param)) {
-	if (param == Qoptional) {
-	  signal_invalid_lambda(this.args, param);
-	} else if (param == Qkey) {
-	  state = 2;
-	  continue;
-	} else if (param == Qrest) {
-	  state = 3;
-	  continue;
-	} else {
-	  sym = param;
-	  value = argv_i < argv.length ? argv[argv_i++] : null;
-	}
+        if (param == Qoptional) {
+          signal_invalid_lambda(this.args, param);
+        } else if (param == Qkey) {
+          state = 2;
+          continue;
+        } else if (param == Qrest) {
+          state = 3;
+          continue;
+        } else {
+          sym = param;
+          value = argv_i < argv.length ? argv[argv_i++] : null;
+        }
       } else if (symbolp(car(param))) {
-	sym = car(param);
-	if (argv_i < argv.length) {
-	  value = argv[argv_i++];
-	} else {
-	  value = force_eval(cadr(param), env);
-	}
+        sym = car(param);
+        if (argv_i < argv.length) {
+          value = argv[argv_i++];
+        } else {
+          value = force_eval(cadr(param), env);
+        }
       } else {
-	signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(this.args, param);
       }
       env = env_push(env, param, value);
       continue;
     case 2: // key
       if (symbolp(param)) {
-	if (param == Qoptional || param == Qkey) {
-	  signal_invalid_lambda(this.args, param);
-	} else if (param == Qrest) {
-	  state = 3;
-	  continue;
-	} else {
-	  sym = param;
-	  def = null;
-	}
+        if (param == Qoptional || param == Qkey) {
+          signal_invalid_lambda(this.args, param);
+        } else if (param == Qrest) {
+          state = 3;
+          continue;
+        } else {
+          sym = param;
+          def = null;
+        }
       } else if (symbolp(car(param))) {
-	sym = car(param);
-	def = cadr(param);
+        sym = car(param);
+        def = cadr(param);
       } else {
-	signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(this.args, param);
       }
       if (keywords === null) {
-	keywords = {};
+        keywords = {};
       }
       var key_sym = string_to_symbol('#:' + symbol_to_string(sym));
       for (j = argv_i; j < argv.length - 1; j++) {
-	if (keywords[j]) {
-	  continue;
-	}
-	if (argv[j] == key_sym) {
-	  keywords[j] = true;
-	  keywords[j+1] = true;
-	  env = env_push(env, sym, argv[j+1]);
-	  continue;
-	}
+        if (keywords[j]) {
+          continue;
+        }
+        if (argv[j] == key_sym) {
+          keywords[j] = true;
+          keywords[j+1] = true;
+          env = env_push(env, sym, argv[j+1]);
+          continue;
+        }
       }
       value = def === null ? null : force_eval(def, env);
       env = env_push(env, param, value);
       continue;
     case 3: // rest
       if (symbolp(param)) {
-	rest = null;
-	for (j = argv.length - 1; j >= argv_i; j--) {
-	  if (keywords && keywords[j]) {
-	    continue;
-	  }
-	  rest = cons(argv[j], rest);
-	}
-	env = env_push(env, param, rest);
-	state = 4;
+        rest = null;
+        for (j = argv.length - 1; j >= argv_i; j--) {
+          if (keywords && keywords[j]) {
+            continue;
+          }
+          rest = cons(argv[j], rest);
+        }
+        env = env_push(env, param, rest);
+        state = 4;
       } else {
-	signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(this.args, param);
       }
       continue;
     case 4: // nothing
@@ -260,10 +288,10 @@ Lambda.prototype.bind_argv = function(argv) {
     if (state < 4) {
       rest = null;
       for (j = argv.length - 1; j >= argv_i; j--) {
-	if (keywords && keywords[j]) {
-	  continue;
-	}
-	rest = cons(argv[j], rest);
+        if (keywords && keywords[j]) {
+          continue;
+        }
+        rest = cons(argv[j], rest);
       }
       env = env_push(env, lst, rest);
     }
@@ -281,6 +309,10 @@ function TailCall(fun, argv) {
 TailCall.prototype.invoke = function() {
   return this.fun.apply(null, this.argv);
 };
+
+function signal_invalid_lambda(lst, arg) {
+  signal(list(Qinvalid_lambda, lst, arg));
+}
 
 module.exports = {
   eval: force_eval

@@ -1,4 +1,24 @@
-// -*- c-style: fb; indent-tabs-mode: nil -*-
+/* Copyright (c) 2015 John Harper <jsh@unfactored.org>
+
+   Permission is hereby granted, free of charge, to any person
+   obtaining a copy of this software and associated documentation files
+   (the "Software"), to deal in the Software without restriction,
+   including without limitation the rights to use, copy, modify, merge,
+   publish, distribute, sublicense, and/or sell copies of the Software,
+   and to permit persons to whom the Software is furnished to do so,
+   subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE. */
 
 'use strict';
 
@@ -45,7 +65,6 @@ function call_with_unwind_protect(thunk, prot_thunk) {
 var Qerror = string_to_symbol('error');
 var Qinvalid_arg = string_to_symbol('invalid-arg');
 var Qmissing_arg = string_to_symbol('missing-arg');
-var Qinvalid_lambda = string_to_symbol('invalid-lambda');
 var Qarith_error = string_to_symbol('arith-error');
 
 function call_with_error_handlers(thunk /* . handlers */) {
@@ -91,10 +110,6 @@ function signal_invalid_arg(arg) {
 
 function signal_missing_arg(i) {
   signal(list(Qmissing_arg, i));
-}
-
-function signal_invalid_lambda(lst, arg) {
-  signal(list(Qinvalid_lambda, lst, arg));
 }
 
 function signal_divide_by_zero() {

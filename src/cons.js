@@ -1,4 +1,24 @@
-// -*- c-style: fb; indent-tabs-mode: nil -*-
+/* Copyright (c) 2015 John Hsarper <jsh@unfactored.org>
+
+   Permission is hereby granted, free of charge, to any person
+   obtaining a copy of this software and associated documentation files
+   (the "Software"), to deal in the Software without restriction,
+   including without limitation the rights to use, copy, modify, merge,
+   publish, distribute, sublicense, and/or sell copies of the Software,
+   and to permit persons to whom the Software is furnished to do so,
+   subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE. */
 
 'use strict';
 
@@ -6,7 +26,14 @@ var Mequality = require('./equality.js');
 var Mthrow = require('./throw.js');
 
 var equal = Mequality['equal?'];
-var check_arg = Mthrow['check-arg'];
+var check_arg, signal_invalid_arg;
+
+// lazy loading to avoid circular object dependency
+function load_throw() {
+  var Mthrow = require('./throw.js');
+  signal_invalid_arg = Mthrow['signal-invalid-arg'];
+  check_arg = Mthrow['check-arg'];
+}
 
 function LispCons(a, b) {
   this.car = a; this.cdr = b;
@@ -55,19 +82,39 @@ function cons(a, b) {
 }
 
 function car(a) {
-  return (a instanceof LispCons) ? a.car : null;
+  if (a instanceof LispCons) {
+    return a.car;
+  } else if (a === null) {
+    return null;
+  } else {
+    load_throw();
+    signal_invalid_arg(a);
+  }
 }
 
 function cdr(a) {
-  return (a instanceof LispCons) ? a.cdr : null;
+  if (a instanceof LispCons) {
+    return a.cdr;
+  } else if (a === null) {
+    return null;
+  } else {
+    load_throw();
+    signal_invalid_arg(a);
+  }
 }
 
 function set_car(a, b) {
+  if (!check_arg) {
+    load_throw();
+  }
   check_arg(a, pairp);
   a.car = b;
 }
 
 function set_cdr(a, b) {
+  if (!check_arg) {
+    load_throw();
+  }
   check_arg(a, pairp);
   a.cdr = b;
 }
