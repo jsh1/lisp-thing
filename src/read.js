@@ -19,12 +19,11 @@ var Qpremature_end_of_stream = string_to_symbol('premature-end-of-stream');
 var Qinvalid_read_syntax = string_to_symbol('invalid-read-syntax');
 
 function signal_end_of_stream(stream, premature) {
-  signal(premature ? Qpremature_end_of_stream : Qend_of_stream,
-         cons(stream, null));
+  signal(list(premature ? Qpremature_end_of_stream : Qend_of_stream, stream));
 }
 
 function signal_read_syntax(stream) {
-  signal(Qinvalid_read_syntax, cons(stream, null));
+  signal(list(Qinvalid_read_syntax, stream));
 }
 
 var Qquote = string_to_symbol('quote');

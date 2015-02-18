@@ -134,7 +134,7 @@ function memq(a, lst) {
   check_arg(lst, listp);
   while (pairp(lst)) {
     if (lst.car === a) {
-      return lst.cdr;
+      return lst;
     }
     lst = lst.cdr;
   }
@@ -145,7 +145,7 @@ function member(a, lst) {
   check_arg(lst, listp);
   while (pairp(lst)) {
     if (equal(lst.car, a)) {
-      return lst.cdr;
+      return lst;
     }
     lst = lst.cdr;
   }

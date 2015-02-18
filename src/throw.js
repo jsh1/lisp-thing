@@ -70,7 +70,7 @@ function call_with_error_handlers(thunk /* . handlers */) {
 function memq(a, lst) {
   while (pairp(lst)) {
     if (lst.car === a) {
-      return lst.cdr;
+      return lst;
     }
     lst = lst.cdr;
   }
