@@ -26,20 +26,25 @@ var Mcons = require('./cons.js');
 var Msymbol = require('./symbol.js');
 
 var pairp = Mcons['pair?'];
-var cons = Mcons.cons;
 var car = Mcons.car;
 var cdr = Mcons.cdr;
-var cadr = Mcons.cadr;
 var listp = Mcons['list?'];
 var list = Mcons.list;
 var string_to_symbol = Msymbol['string->symbol'];
+
+// data must be a list
+
+function LispException(tag, data) {
+  this.tag = tag;
+  this.data = data;
+}
 
 function call_with_catch(tag, thunk) {
   try {
     return thunk();
   } catch(e) {
-    if (car(e) === tag) {
-      return cdr(e);
+    if (e instanceof LispException && e.tag === tag) {
+      return e.data;
     } else {
       throw e;
     }
@@ -47,19 +52,11 @@ function call_with_catch(tag, thunk) {
 }
 
 function call_with_unwind_protect(thunk, prot_thunk) {
-  var threw = false;
-  var ret, exc;
   try {
-    ret = thunk();
-  } catch(e) {
-    threw = true;
-    exc = e;
+    return thunk();
+  } finally {
+    prot_thunk();
   }
-  prot_thunk();
-  if (threw) {
-    throw exc;
-  }
-  return ret;
 }
 
 var Qerror = string_to_symbol('error');
@@ -71,15 +68,15 @@ function call_with_error_handlers(thunk /* . handlers */) {
   try {
     return thunk();
   } catch(e) {
-    if (car(e) !== Qerror) {
+    if (!(e instanceof LispException) || e.tag !== Qerror) {
       throw e;
     }
-    var type = cadr(e);
+    var type = e.data.car;
     for (var i = 1; i < arguments.length; i++) {
       var h_type = car(arguments[i]);
       if ((listp(h_type) && memq(type, h_type)) ||
           h_type === Qerror || h_type === type) {
-        return cdr(arguments[i])(cdr(e));
+        return cdr(arguments[i])(e.data);
       }
     }
     throw e;
@@ -97,11 +94,11 @@ function memq(a, lst) {
 }
 
 function throw_(tag, value) {
-  throw cons(tag, value);
+  throw new LispException(tag, value);
 }
 
 function signal(data) {
-  throw cons(Qerror, data);
+  throw new LispException(Qerror, data);
 }
 
 function signal_invalid_arg(arg) {

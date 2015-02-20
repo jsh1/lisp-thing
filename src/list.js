@@ -196,6 +196,91 @@ function assoc(lst, a) {
   return null;
 }
 
+function apply(f) {
+  var argv = [];
+  for (var i = 1; i < arguments.length - 1; i++) {
+    argv.push(arguments[i]);
+  }
+  if (arguments.length > 1) {
+    var lst = arguments[arguments.length - 1];
+    check_arg(lst, listp);
+    while (pairp(lst)) {
+      argv.push(lst.car);
+      lst = lst.cdr;
+    }
+  }
+  // FIXME: tail recursion?
+  return f.apply(null, argv);
+}
+
+function map(f, lst) {
+  check_arg(lst, listp);
+  var ret = null;
+  var tail = null;
+  var value;
+  if (arguments.length === 2) {
+    while (pairp(lst)) {
+      value = f(lst.car);
+      lst = lst.cdr;
+      if (tail) {
+        tail = tail.cdr = cons(value, null);
+      } else {
+        tail = ret = cons(value, null);
+      }
+    }
+  } else {
+    var argv = [lst];
+    for (var i = 2; i < arguments.length; i++) {
+      argv.push(arguments[i]);
+    }
+    while (pairp(lst)) {
+      var argvv = [lst.car];
+      lst = lst.cdr;
+      for (var i = 2; i < arguments.length; i++) {
+        var arg = argv[i-2];
+        check_arg(arg, pairp);
+        argvv.push(arg.car);
+        argv[i-2] = arg.cdr;
+      }
+      value = f.apply(null, argvv);
+      if (tail) {
+        tail = tail.cdr = cons(value, null);
+      } else {
+        tail = ret = cons(value, null);
+      }
+    }
+  }
+  return ret;
+}
+
+function for_each(f, lst) {
+  check_arg(lst, listp);
+  var value;
+  if (arguments.length === 2) {
+    while (pairp(lst)) {
+      f(lst.car);
+      lst = lst.cdr;
+    }
+  } else {
+    var argv = [lst];
+    for (var i = 2; i < arguments.length; i++) {
+      argv.push(arguments[i]);
+    }
+    while (pairp(lst)) {
+      var argvv = [lst.car];
+      lst = lst.cdr;
+      for (var i = 2; i < arguments.length; i++) {
+        var arg = argv[i-2];
+        check_arg(arg, pairp);
+        argvv.push(arg.car);
+        argv[i-2] = arg.cdr;
+      }
+      f(lst.car);
+    }
+  }
+  return ret;
+}
+
 module.exports = {
   'make-list': make_list,
   append: append,
@@ -208,5 +293,8 @@ module.exports = {
   memq: memq,
   member: member,
   assq: assq,
-  assoc: assoc
+  assoc: assoc,
+  apply: apply,
+  'for-each': for_each,
+  map: map
 };

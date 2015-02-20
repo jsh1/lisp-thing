@@ -24,6 +24,7 @@
 
 var Msymbol = require('./symbol.js');
 var Mcons = require('./cons.js');
+var Mlist = require('./list.js');
 var Mthrow = require('./throw.js');
 
 var symbolp = Msymbol['symbol?'];
@@ -38,81 +39,92 @@ var cddr = Mcons.cddr;
 var caddr = Mcons.caddr;
 var cdddr = Mcons.cdddr;
 var list = Mcons.list;
+var apply = Mlist.apply;
 var signal = Mthrow.signal;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
 
 var Qinvalid_lambda = string_to_symbol('invalid-lambda');
 var Qunbound_variable = string_to_symbol('unbound-variable');
+var Qmacro = string_to_symbol('macro');
 
-function lazy_eval(form, env, tail_posn) {
-  while (true) {
-    form = macroexpand(form, env);
+function eval_(form, env) {
+  if (symbolp(form)) {
+    return env_ref(env, form);
+  } else if (!pairp(form)) {
+    return form;
+  }
 
-    if (symbolp(form)) {
-      return env_ref(env, form);
-    } else if (!pairp(form)) {
-      return form;
-    }
+  var fun = form.car;
+  form = form.cdr;
 
-    var fun = form.car;
-    form = form.cdr;
-
-    if (symbolp(fun)) {
-      var value;
-      switch (fun.sym) {
-      case 'set!':
-        return env_set(env, car(form), force_eval(cadr(form), env));
-      case 'quote':
-        return car(form);
-      case 'lambda':
-        return new Lambda(car(form), cdr(form), env);
-      case 'if':
-        value = force_eval(car(form), env);
-        form = cdr(form);
-        if (!(value === false || value === null || value === undefined)) {
-          form = car(form);
-          continue;
-        } else {
-          form = cdr(form);
-          while (pairp(cdr(form))) {
-            force_eval(form.car, env);
-            form = form.cdr;
-          }
-          form = car(form);
-          continue;
-        }
-        // not reached
+  if (symbolp(fun)) {
+    var value;
+    switch (fun.sym) {
+    case 'set!':
+      return env_set(env, car(form), eval_(cadr(form), env));
+    case 'quote':
+      return car(form);
+    case 'lambda':
+      return make_procedure(car(form), cdr(form), env);
+    case 'if':
+      value = eval_(car(form), env);
+      form = cdr(form);
+      if (!false_condition(value)) {
+	return eval_(car(form), env);
+      } else {
+	return progn(cdr(form), env);
       }
-    }
-
-    fun = force_eval(fun, env);
-
-    var argv = [];
-    while (pairp(form)) {
-      argv.push(force_eval(form.car, env));
-      form = form.cdr;
-    }
-
-    if (tail_posn) {
-      return new TailCall(fun, argv);
-    } else {
-      return fun.apply(null, argv);
+      break;
+    case 'while':
+      while (true) {
+	value = eval_(car(form), env);
+	if (false_condition(value)) {
+	  return value;
+	}
+	progn(cdr(form), env)
+      }
+      /* not reached. */
+    case 'progn':
+      return progn(form, env);
     }
   }
 
-  // not reached
-}
+  fun = eval_(fun, env);
 
-function force_eval(form, env) {
-  var value = lazy_eval(form, env, false);
-  if (value instanceof TailCall) {
-    value = value.invoke();
+  if (pairp(fun) && fun.car == Qmacro) {
+    return eval_(apply(cdr(fun), form), env);
   }
-  return value;
+
+  /* FIXME: to do tail call elimination we'd need a custom `apply`
+     and to not represent lisp functions as JS functions. Right
+     now that seems like a bad trade-off as our long-term goal is
+     to compile lambda expressions to native JS functions. */
+
+  return fun.apply(null, eval_list(form, env));
 }
 
-function macroexpand(form, env) {
-  return form;
+function false_condition(value) {
+  return value === false || value === null || value === undefined
+}
+
+// returns an array
+
+function eval_list(lst, env) {
+  var vec = [];
+  while (pairp(lst)) {
+    vec.push(eval_(lst.car, env));
+    lst = lst.cdr;
+  }
+  return vec;
+}
+
+function progn(lst, env) {
+  var ret;
+  while (pairp(lst)) {
+    ret = eval_(lst.car, env);
+    lst = lst.cdr;
+  }
+  return ret;
 }
 
 function env_ref(env, sym) {
@@ -151,32 +163,27 @@ function env_push(env, sym, value) {
   return cons(cons(sym, value), env);
 }
 
-function Lambda(args, body, env) {
-  this.args = args;
-  this.body = body;
-  this.env = env;
-}
+/* FIXME: preprocess lambda args outside the closure, then try to
+   return a specialized function that matches the argument patterns
+   (for small numbers of required arguments). */
 
-Lambda.prototype.apply = function(unused, argv) {
-  var lst = this.body;
-  while (pairp(cdr(lst))) {
-    force_eval(lst.car, this.env);
-    lst = lst.cdr;
-  }
-  return lazy_eval(car(lst), this.bind_argv(argv), true);
-};
+function make_procedure(args, body, env) {
+  function apply_lambda() {
+    return progn(body, procedure_env(args, arguments, env));
+  };
+  return apply_lambda;
+}
 
 var Qoptional = string_to_symbol('#!optional');
 var Qkey = string_to_symbol('#!key');
 var Qrest = string_to_symbol('#!rest');
 
-Lambda.prototype.bind_argv = function(argv) {
-  var env = this.env;
+function procedure_env(args, argv, env) {
   var argv_i = 0;
   var state = 0;
   var keywords = null;
-  var lst = this.args;
   var sym, value, def, j, rest;
+  var lst = args;
   while (pairp(lst)) {
     var param = lst.car;
     lst = lst.cdr;
@@ -200,14 +207,14 @@ Lambda.prototype.bind_argv = function(argv) {
           value = argv[argv_i++];
         }
       } else {
-        signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(args, param);
       }
       env = env_push(env, sym, value);
       continue;
     case 1: // optional
       if (symbolp(param)) {
         if (param == Qoptional) {
-          signal_invalid_lambda(this.args, param);
+          signal_invalid_lambda(args, param);
         } else if (param == Qkey) {
           state = 2;
           continue;
@@ -223,17 +230,17 @@ Lambda.prototype.bind_argv = function(argv) {
         if (argv_i < argv.length) {
           value = argv[argv_i++];
         } else {
-          value = force_eval(cadr(param), env);
+          value = eval_(cadr(param), env);
         }
       } else {
-        signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(args, param);
       }
       env = env_push(env, param, value);
       continue;
     case 2: // key
       if (symbolp(param)) {
         if (param == Qoptional || param == Qkey) {
-          signal_invalid_lambda(this.args, param);
+          signal_invalid_lambda(args, param);
         } else if (param == Qrest) {
           state = 3;
           continue;
@@ -245,7 +252,7 @@ Lambda.prototype.bind_argv = function(argv) {
         sym = car(param);
         def = cadr(param);
       } else {
-        signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(args, param);
       }
       if (keywords === null) {
         keywords = {};
@@ -262,7 +269,7 @@ Lambda.prototype.bind_argv = function(argv) {
           continue;
         }
       }
-      value = def === null ? null : force_eval(def, env);
+      value = def === null ? null : eval_(def, env);
       env = env_push(env, param, value);
       continue;
     case 3: // rest
@@ -277,11 +284,11 @@ Lambda.prototype.bind_argv = function(argv) {
         env = env_push(env, param, rest);
         state = 4;
       } else {
-        signal_invalid_lambda(this.args, param);
+        signal_invalid_lambda(args, param);
       }
       continue;
     case 4: // nothing
-      signal_invalid_lambda(this.args, param);
+      signal_invalid_lambda(args, param);
     }
   }
   if (symbolp(lst)) {
@@ -296,24 +303,15 @@ Lambda.prototype.bind_argv = function(argv) {
       env = env_push(env, lst, rest);
     }
   } else if (lst !== null) {
-    signal_invalid_lambda(this.args, lst);
+    signal_invalid_lambda(args, lst);
   }
   return env;
-};
-
-function TailCall(fun, argv) {
-  this.fun = fun;
-  this.argv = argv;
 }
-
-TailCall.prototype.invoke = function() {
-  return this.fun.apply(null, this.argv);
-};
 
 function signal_invalid_lambda(lst, arg) {
   signal(list(Qinvalid_lambda, lst, arg));
 }
 
 module.exports = {
-  eval: force_eval
+  eval: eval_
 };

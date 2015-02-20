@@ -41,10 +41,6 @@ function positive_integer_p(a) {
   return typeof a === 'number' && Math.abs(a|0) === a;
 }
 
-function zerop(a) {
-  return a === 0;
-}
-
 function foldv(args, pred, f) {
   if (args.length < 1) {
     signal_missing_arg(1);
@@ -65,6 +61,20 @@ function number_foldv(args, f) {
 
 function integer_foldv(args, f) {
   return foldv(args, integerp, f);
+}
+
+function compare_foldv(args, f) {
+  if (args.length < 2) {
+    signal_missing_arg(args.length + 1);
+  }
+  check_arg(args[0], numberp);
+  for (var i = 1; i < args.length; i++) {
+    check_arg(args[i], numberp);
+    if (!f(args[i-1], args[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function plus() {
@@ -120,7 +130,7 @@ function remainder(a, b) {
   }
 }
 
-function mod(a, b) {
+function modulo(a, b) {
   check_arg(a, numberp);
   check_arg(b, numberp);
   if (b === 0) {
@@ -284,6 +294,20 @@ function gcd() {
   }
 }
 
+function lcm() {
+  if (arguments.length === 0) {
+    return 1;
+  } else {
+    var prod = 1;
+    for (var i = 0; i < arguments.length; i++) {
+      check_arg(arguments[i], numberp);
+      prod = prod * Math.abs(arguments[i]);
+    }
+    var div = gcd.apply(null, arguments);
+    return prod / div;
+  }
+}
+
 function max() {
   return foldv(arguments, function (a) {return true;}, function(a, b) {
     // FIXME: using '<' directly not a good idea?
@@ -296,6 +320,56 @@ function min() {
     // FIXME: using '<' directly not a good idea?
     return a < b ? a : b;
   });
+}
+
+function abs(x) {
+  check_arg(x, numberp);
+  return Math.abs(x);
+}
+
+function numeric_equal() {
+  return compare_foldv(arguments, function(a, b) {return a === b;});
+}
+
+function numeric_less() {
+  return compare_foldv(arguments, function(a, b) {return a < b;});
+}
+
+function numeric_greater() {
+  return compare_foldv(arguments, function(a, b) {return a > b;});
+}
+
+function numeric_less_or_equal() {
+  return compare_foldv(arguments, function(a, b) {return a <= b;});
+}
+
+function numeric_greater_or_equal() {
+  return compare_foldv(arguments, function(a, b) {return a >= b;});
+}
+
+function zerop(x) {
+  check_arg(x, numberp);
+  return x === 0;
+}
+
+function positivep(x) {
+  check_arg(x, numberp);
+  return x > 0;
+}
+
+function negativep(x) {
+  check_arg(x, numberp);
+  return x < 0;
+}
+
+function oddp(x) {
+  check_arg(x, numberp);
+  return x % 1 === 1;
+}
+
+function evenp(x) {
+  check_arg(x, numberp);
+  return x %1 === 0;
 }
 
 function string_to_number(str, radix) {
@@ -315,13 +389,12 @@ module.exports = {
   'number?': numberp,
   'integer?': integerp,
   'positive-integer?': positive_integer_p,
-  'zero?': zerop,
   '+': plus,
   '-': minus,
   '*': product,
   '/': divide,
   remainder: remainder,
-  mod: mod,
+  modulo: modulo,
   quotient: quotient,
   lognot: lognot,
   logior: logior,
@@ -345,8 +418,20 @@ module.exports = {
   sqrt: sqrt,
   expt: expt,
   gcd: gcd,
+  lcm: lcm,
   max: max,
   min: min,
+  abs: abs,
+  '=': numeric_equal,
+  '<': numeric_less,
+  '>': numeric_greater,
+  '<=': numeric_less_or_equal,
+  '>=': numeric_greater_or_equal,
+  'zero?': zerop,
+  'positive?': positivep,
+  'negative?': negativep,
+  'odd?': oddp,
+  'even?': evenp,
   'string->number': string_to_number,
   'number->string': number_to_string,
 };

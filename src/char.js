@@ -123,7 +123,7 @@ function integer_to_char(c) {
 }
 
 function read_char(stream) {
-  var c = stream.getc(char_to_integer(c));
+  var c = stream.getc();
   if (c !== -1) {
     return integer_to_char(c);
   } else {
@@ -132,7 +132,7 @@ function read_char(stream) {
 }
 
 function peek_char(stream) {
-  var c = stream.getc(char_to_integer(c));
+  var c = stream.getc();
   if (c !== -1) {
     stream.ungetc();
     return integer_to_char(c);

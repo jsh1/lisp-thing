@@ -28,6 +28,7 @@ var modules = [
   require('./equality.js'),
   require('./list.js'),
   require('./number.js'),
+  require('./sequence.js'),
   require('./string.js'),
   require('./symbol.js'),
   require('./throw.js'),
