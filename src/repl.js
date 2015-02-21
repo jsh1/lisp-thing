@@ -27,6 +27,7 @@ var fs = require('fs');
 
 var Mcore = require('./core.js');
 var Meval = require('./eval.js');
+var Mload = require('./load.js');
 var Mread = require('./read.js');
 var Mprint = require('./print.js');
 
@@ -45,60 +46,16 @@ var call_with_error_handlers = Mcore['call-with-error-handlers'];
 var intern = Mcore['string->symbol'];
 var symbol_to_string = Mcore['symbol->string'];
 
-var Qdefine = intern('define');
-var Qload = intern('load');
-
 var Qerror = intern('error');
-var Qfile_error = intern('file-error');
 var Qend_of_stream = intern('end-of-stream');
 var Qpremature_end_of_stream = intern('premature-end-of-stream');
 
 // our global environment
-var environment = Object.create(Mcore);
+var user_env = {};
+var environment = list(user_env, Mcore, Mread, Meval, Mload, Mprint);
 
-function repl_eval(form, echo) {
-  var result;
-  if (pairp(form)) {
-    if (car(form) === Qdefine) {
-      // `eval` won't extend our environment!
-      result = Meval.eval(caddr(form), environment);
-      environment[symbol_to_string(cadr(form))] = result;
-      return;
-    } else if (car(form) == Qload) {
-      // neither will `load`
-      repl_load(cadr(form));
-      return;
-    }
-  }
-  result = Meval.eval(form, environment);
-  if (echo && result !== undefined) {
-    var out = new OutputString();
-    Mprint.write(result, out);
-    process.stdout.write(out.get() + '\n');
-  }
-}
-
-function repl_load(filename) {
-  fs.readFile(filename, function (err, buffer) {
-    if (err) {
-      signal(list(Qfile_error, "No such file", filename));
-    } else {
-      var input = new InputString(buffer.toString());
-      var finished = false;
-      while (!finished) {
-        var form = undefined;
-        call_with_error_handlers(function () {
-          form = Mread.read(input);
-        }, cons(Qend_of_stream, function (err) {
-          finished = true;
-        }));
-        if (form !== undefined) {
-          repl_eval(form, false);
-        }
-      }
-    }
-  });
-}
+// FIXME: so it can be passed to load and eval!?
+user_env.environment = environment;
 
 var rl = readline.createInterface(process.stdin, process.stdout);
 
@@ -113,8 +70,12 @@ rl.on('line', function(str) {
     var form = Mread.read(new InputString(str));
     rl.setPrompt('lisp> ');
     call_with_error_handlers(function () {
-      var result;
-      repl_eval(form, true);
+      var result = Meval.eval(form, environment);
+      if (result !== undefined) {
+        var out = new OutputString();
+        Mprint.write(result, out);
+        process.stdout.write(out.get() + '\n');
+      }
     }, cons(Qerror,
             function(err) {
               var out = new OutputString();

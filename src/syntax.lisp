@@ -1,27 +1,45 @@
 
-(define let
-  (cons 'macro (lambda (bindings . body)
-		 (cons (list* 'lambda
-			      (map (lambda (x)
-				     (if (pair? x) (car x) x)) bindings)
-			      body)
-		       (map (lambda (x)
-			      (if (pair? x) (cons 'progn (cdr x)) ()))
-			    bindings)))))
+;; Syntactic expansions
 
-(define let*
-  (cons 'macro (lambda (bindings . body)
-		 (if (eq? (list-length bindings) 0)
-		     (cons 'progn body)
-		   (if (eq? 
+(define define-macro
+  (cons 'macro (lambda (args . def)
+		 (list 'define (car args)
+		       (list 'cons ''macro (list* 'lambda (cdr args) def))))))
 
-(define catch
-  (cons 'macro (lambda (tag . body)
-		 (list 'call-with-catch (list 'quote tag)
-		       (list* 'lambda () body)))))
+(define-macro (let bindings . body)
+  (cons (list* 'lambda
+	       (map (lambda (x)
+		      (if (pair? x) (car x) x)) bindings)
+	       body)
+	(map (lambda (x)
+	       (if (pair? x) (cons 'progn (cdr x)) ()))
+	     bindings)))
 
-(define unwind-protect
-  (cons 'macro (lambda (form . body)
-		 (list 'call-with-unwind-protect
-		       (list 'lambda () form)
-		       (list* 'lambda () body)))))
+(define-macro (letrec bindings . body)
+  ((lambda (vars setters)
+     (list* 'let vars (nconc setters body)))
+   (map (lambda (x)
+	  (if (pair? x) (car x) x)) bindings)
+   (map (lambda (x)
+	  (if (pair? x)
+	      (list 'set! (car x) (cons 'progn (cdr x)))
+	    (list 'set! x nil))) bindings)))
+
+(define-macro (cond . forms)
+  (let ((lst (reverse forms))
+	(ret #f))
+    (while (pair? lst)
+      (set! ret (list 'if (caar lst) (cons 'progn (cdar lst)) ret))
+      (set! lst (cdr lst)))
+    ret))
+
+;;(define let*
+;;  (cons 'macro (lambda (bindings . body))))
+
+(define-macro (catch tag . body)
+  (list 'call-with-catch tag (list* 'lambda () body)))
+
+(define-macro (unwind-protect form . body)
+  (list 'call-with-unwind-protect
+	(list 'lambda () form)
+	(list* 'lambda () body)))

@@ -22,26 +22,25 @@
 
 'use strict';
 
-var Msymbol = require('./symbol.js');
-var Mcons = require('./cons.js');
-var Mlist = require('./list.js');
+var Mcore = require('./core.js');
 var Mthrow = require('./throw.js');
 
-var symbolp = Msymbol['symbol?'];
-var string_to_symbol = Msymbol['string->symbol'];
-var symbol_to_string = Msymbol['symbol->string'];
-var pairp = Mcons['pair?'];
-var cons = Mcons.cons;
-var car = Mcons.car;
-var cdr = Mcons.cdr;
-var cadr = Mcons.cadr;
-var cddr = Mcons.cddr;
-var caddr = Mcons.caddr;
-var cdddr = Mcons.cdddr;
-var list = Mcons.list;
-var apply = Mlist.apply;
+var symbolp = Mcore['symbol?'];
+var string_to_symbol = Mcore['string->symbol'];
+var symbol_to_string = Mcore['symbol->string'];
+var pairp = Mcore['pair?'];
+var cons = Mcore.cons;
+var car = Mcore.car;
+var cdr = Mcore.cdr;
+var cadr = Mcore.cadr;
+var cddr = Mcore.cddr;
+var caddr = Mcore.caddr;
+var cdddr = Mcore.cdddr;
+var list = Mcore.list;
+var apply = Mcore.apply;
 var signal = Mthrow.signal;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
+var call_with_error_handlers = Mthrow['call-with-error-handlers'];
 
 var Qinvalid_lambda = string_to_symbol('invalid-lambda');
 var Qunbound_variable = string_to_symbol('unbound-variable');
@@ -60,6 +59,8 @@ function eval_(form, env) {
   if (symbolp(fun)) {
     var value;
     switch (fun.sym) {
+    case 'define':
+      return env_define(env, car(form), eval_(cadr(form), env));
     case 'set!':
       return env_set(env, car(form), eval_(cadr(form), env));
     case 'quote':
@@ -81,7 +82,7 @@ function eval_(form, env) {
 	if (false_condition(value)) {
 	  return value;
 	}
-	progn(cdr(form), env)
+	progn(cdr(form), env);
       }
       /* not reached. */
     case 'progn':
@@ -92,7 +93,7 @@ function eval_(form, env) {
   fun = eval_(fun, env);
 
   if (pairp(fun) && fun.car == Qmacro) {
-    return eval_(apply(cdr(fun), form), env);
+    return eval_(apply(fun.cdr, form), env);
   }
 
   /* FIXME: to do tail call elimination we'd need a custom `apply`
@@ -104,7 +105,7 @@ function eval_(form, env) {
 }
 
 function false_condition(value) {
-  return value === false || value === null || value === undefined
+  return value === false || value === null || value === undefined;
 }
 
 // returns an array
@@ -127,40 +128,42 @@ function progn(lst, env) {
   return ret;
 }
 
+// environment is a list of frames, each frame is an object
+
+function env_begin(env) {
+  return cons({}, env);
+}
+
 function env_ref(env, sym) {
   while (pairp(env)) {
-    var cell = env.car;
-    if (cell.car === sym) {
-      return cell.cdr;
+    var map = env.car;
+    if (map.hasOwnProperty(sym.sym)) {
+      return map[sym.sym];
     }
     env = env.cdr;
   }
-  // alist can be dotted to object with global env
-  var value = env ? env[sym.sym] : undefined;
-  if (value !== undefined) {
-    return value;
-  } else {
-    signal(list(Qunbound_variable, sym));
-  }
+  signal(list(Qunbound_variable, sym));
 }
 
 function env_set(env, sym, value) {
   while (pairp(env)) {
-    var cell = env.car;
-    if (cell.car === sym) {
-      cell.cdr = value;
+    var map = env.car;
+    if (map.hasOwnProperty(sym.sym)) {
+      map[sym.sym] = value;
       return;
     }
   }
-  if (env && env.hasOwnProperty(sym.sym)) {
-    env[sym.sym] = value;
-  } else {
-    signal(list(Qunbound_variable, sym));
-  }
+  signal(list(Qunbound_variable, sym));
 }
 
-function env_push(env, sym, value) {
-  return cons(cons(sym, value), env);
+function env_define(env, sym, value) {
+  if (pairp(env)) {
+    var map = env.car;
+    map[sym.sym] = value;
+  } else {
+    // FIXME: better error?
+    signal(list(Qunbound_variable, sym));
+  }
 }
 
 /* FIXME: preprocess lambda args outside the closure, then try to
@@ -170,7 +173,7 @@ function env_push(env, sym, value) {
 function make_procedure(args, body, env) {
   function apply_lambda() {
     return progn(body, procedure_env(args, arguments, env));
-  };
+  }
   return apply_lambda;
 }
 
@@ -179,6 +182,8 @@ var Qkey = string_to_symbol('#!key');
 var Qrest = string_to_symbol('#!rest');
 
 function procedure_env(args, argv, env) {
+  // create a new frame for this lambda
+  env = env_begin(env);
   var argv_i = 0;
   var state = 0;
   var keywords = null;
@@ -209,7 +214,7 @@ function procedure_env(args, argv, env) {
       } else {
         signal_invalid_lambda(args, param);
       }
-      env = env_push(env, sym, value);
+      env_define(env, sym, value);
       continue;
     case 1: // optional
       if (symbolp(param)) {
@@ -235,7 +240,7 @@ function procedure_env(args, argv, env) {
       } else {
         signal_invalid_lambda(args, param);
       }
-      env = env_push(env, param, value);
+      env_define(env, param, value);
       continue;
     case 2: // key
       if (symbolp(param)) {
@@ -265,12 +270,12 @@ function procedure_env(args, argv, env) {
         if (argv[j] == key_sym) {
           keywords[j] = true;
           keywords[j+1] = true;
-          env = env_push(env, sym, argv[j+1]);
+          env_define(env, sym, argv[j+1]);
           continue;
         }
       }
       value = def === null ? null : eval_(def, env);
-      env = env_push(env, param, value);
+      env_define(env, param, value);
       continue;
     case 3: // rest
       if (symbolp(param)) {
@@ -281,7 +286,7 @@ function procedure_env(args, argv, env) {
           }
           rest = cons(argv[j], rest);
         }
-        env = env_push(env, param, rest);
+        env_define(env, param, rest);
         state = 4;
       } else {
         signal_invalid_lambda(args, param);
@@ -300,7 +305,7 @@ function procedure_env(args, argv, env) {
         }
         rest = cons(argv[j], rest);
       }
-      env = env_push(env, lst, rest);
+      env_define(env, lst, rest);
     }
   } else if (lst !== null) {
     signal_invalid_lambda(args, lst);

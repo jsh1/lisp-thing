@@ -217,7 +217,7 @@ function map(f, lst) {
   check_arg(lst, listp);
   var ret = null;
   var tail = null;
-  var value;
+  var value, i;
   if (arguments.length === 2) {
     while (pairp(lst)) {
       value = f(lst.car);
@@ -230,13 +230,13 @@ function map(f, lst) {
     }
   } else {
     var argv = [lst];
-    for (var i = 2; i < arguments.length; i++) {
+    for (i = 2; i < arguments.length; i++) {
       argv.push(arguments[i]);
     }
     while (pairp(lst)) {
       var argvv = [lst.car];
       lst = lst.cdr;
-      for (var i = 2; i < arguments.length; i++) {
+      for (i = 2; i < arguments.length; i++) {
         var arg = argv[i-2];
         check_arg(arg, pairp);
         argvv.push(arg.car);
@@ -255,7 +255,7 @@ function map(f, lst) {
 
 function for_each(f, lst) {
   check_arg(lst, listp);
-  var value;
+  var value, i;
   if (arguments.length === 2) {
     while (pairp(lst)) {
       f(lst.car);
@@ -263,13 +263,13 @@ function for_each(f, lst) {
     }
   } else {
     var argv = [lst];
-    for (var i = 2; i < arguments.length; i++) {
+    for (i = 2; i < arguments.length; i++) {
       argv.push(arguments[i]);
     }
     while (pairp(lst)) {
       var argvv = [lst.car];
       lst = lst.cdr;
-      for (var i = 2; i < arguments.length; i++) {
+      for (i = 2; i < arguments.length; i++) {
         var arg = argv[i-2];
         check_arg(arg, pairp);
         argvv.push(arg.car);
@@ -278,7 +278,6 @@ function for_each(f, lst) {
       f(lst.car);
     }
   }
-  return ret;
 }
 
 module.exports = {
