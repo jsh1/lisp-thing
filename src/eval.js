@@ -1,24 +1,4 @@
-/* Copyright (c) 2015 John Harper <jsh@unfactored.org>
-
-   Permission is hereby granted, free of charge, to any person
-   obtaining a copy of this software and associated documentation files
-   (the "Software"), to deal in the Software without restriction,
-   including without limitation the rights to use, copy, modify, merge,
-   publish, distribute, sublicense, and/or sell copies of the Software,
-   and to permit persons to whom the Software is furnished to do so,
-   subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be
-   included in all copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE. */
+// Copyright (c) 2015 John Harper. All rights reserved.
 
 'use strict';
 
@@ -46,6 +26,10 @@ var Qinvalid_lambda = string_to_symbol('invalid-lambda');
 var Qunbound_variable = string_to_symbol('unbound-variable');
 var Qmacro = string_to_symbol('macro');
 
+/* Leaving tail call elimination to the mercy of the host interpreter.
+   Javascript will catch up eventually, none of the hacks we could do
+   would really help. */
+
 function eval_(form, env) {
   if (symbolp(form)) {
     return env_ref(env, form);
@@ -57,7 +41,7 @@ function eval_(form, env) {
   form = form.cdr;
 
   if (symbolp(fun)) {
-    var value;
+    var value, term;
     switch (fun.sym) {
     case 'define':
       return env_define(env, car(form), eval_(cadr(form), env));
@@ -67,15 +51,21 @@ function eval_(form, env) {
       return car(form);
     case 'lambda':
       return make_procedure(car(form), cdr(form), env);
-    case 'if':
-      value = eval_(car(form), env);
-      form = cdr(form);
-      if (!false_condition(value)) {
-	return eval_(car(form), env);
-      } else {
-	return progn(cdr(form), env);
+    case 'cond':
+      while (pairp(form)) {
+        term = form.car;
+        value = eval_(car(term), env);
+        if (!false_condition(value)) {
+          term = cdr(term);
+          if (pairp(term)) {
+            return progn(term, env);
+          } else {
+            return value;
+          }
+        }
+        form = form.cdr;
       }
-      break;
+      return false;
     case 'while':
       while (true) {
 	value = eval_(car(form), env);
@@ -95,11 +85,6 @@ function eval_(form, env) {
   if (pairp(fun) && fun.car == Qmacro) {
     return eval_(apply(fun.cdr, form), env);
   }
-
-  /* FIXME: to do tail call elimination we'd need a custom `apply`
-     and to not represent lisp functions as JS functions. Right
-     now that seems like a bad trade-off as our long-term goal is
-     to compile lambda expressions to native JS functions. */
 
   return fun.apply(null, eval_list(form, env));
 }
