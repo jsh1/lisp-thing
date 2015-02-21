@@ -7,7 +7,7 @@ function booleanp(x) {
 }
 
 function not(x) {
-  return x === false || x === null || x === undefined ? false : true;
+  return x === false || x === null || x === undefined ? true : false;
 }
 
 function eq(a, b) {

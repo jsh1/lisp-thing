@@ -16,6 +16,10 @@ LispChar.prototype.equal = function(a) {
   return a instanceof LispChar && this.char === a.char;
 };
 
+LispChar.prototype.toString = function() {
+  return this.char;
+};
+
 LispChar.prototype.print = function(print, stream, level, opts) {
   if (opts.hasOwnProperty('readable') && !opts.readable) {
     stream.puts(this.char);

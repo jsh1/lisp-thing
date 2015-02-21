@@ -11,6 +11,7 @@ var cons = Mcons.cons;
 var list = Mcons.list;
 var symbolp = Msymbol['symbol?'];
 var string_to_symbol = Msymbol['string->symbol'];
+var string_to_keyword = Msymbol['string->keyword'];
 var integer_to_char = Mchar['integer->char'];
 var signal = Mthrow.signal;
 
@@ -71,9 +72,10 @@ function read_form(stream, nested) {
       case 92: // '\\'
         return read_char(stream);
       case 33: // '!'
-      case 58: // ':'
         stream.ungetc();
-        return read_atom(stream, 35, false);
+        return read_atom(stream, 35, false, string_to_symbol);
+      case 58: // ':'
+        return read_atom(stream, stream.getc(), false, string_to_keyword);
       case 116: // 't'
       case 84: // 'T'
         return true;
@@ -101,11 +103,12 @@ function read_form(stream, nested) {
       }
       /* falls through */
     default:
-      form = read_atom(stream, c, true);
+      form = read_atom(stream, c, true, string_to_symbol);
       if (symbolp(form)) {
         c = stream.getc()||0;
         if (c === 35) {
-          return list(Qref, form, list(Qquote, read_form(stream, true)));
+          var key = read_atom(stream, stream.getc(), false, string_to_symbol);
+          return list(Qref, form, list(Qquote, key));
         } else {
           stream.ungetc();
         }
@@ -321,7 +324,7 @@ function read_char(stream) {
   signal_read_syntax(stream);
 }
 
-function read_atom(stream, c, allow_number) {
+function read_atom(stream, c, allow_number, intern) {
   c = c|0;
   var buffer = '';
   var radix = allow_number ? -1 : 0;
@@ -336,7 +339,8 @@ function read_atom(stream, c, allow_number) {
   while (c !== -1) {
     if (isdelim(c)) {
       stream.ungetc();
-      return finish_atom(stream, buffer, ifirst, rational, radix, exact, sign);
+      return finish_atom(stream, buffer, ifirst, rational,
+                         radix, exact, sign, intern);
     }
     switch (c) {
     case 92: // '\\'
@@ -361,7 +365,8 @@ function read_atom(stream, c, allow_number) {
     case 35: // '#'
       if (radix === 0 && buffer.length > 0) {
         stream.ungetc();
-        return finish_atom(stream, buffer, ifirst, rational, radix, exact, sign);
+        return finish_atom(stream, buffer, ifirst, rational,
+                           radix, exact, sign, inter);
       }
       /* falls through */
     default:
@@ -480,10 +485,13 @@ function read_atom(stream, c, allow_number) {
   if (c !== -1) {
     stream.ungetc();
   }
-  return finish_atom(stream, buffer, ifirst, rational, radix, exact, sign);
+  return finish_atom(stream, buffer, ifirst, rational,
+                     radix, exact, sign, intern);
 }
 
-function finish_atom(stream, buffer, ifirst, rational, radix, exact, sign) {
+function finish_atom(stream, buffer, ifirst, rational,
+                     radix, exact, sign, intern)
+{
   if (buffer.length === 0) {
     signal_read_syntax(stream);
   }
@@ -507,7 +515,7 @@ function finish_atom(stream, buffer, ifirst, rational, radix, exact, sign) {
       return number * sign;
     }   
   }
-  return string_to_symbol(buffer);
+  return intern(buffer);
 }
 
 // utility functions

@@ -16,6 +16,7 @@ var intern = Mcore['string->symbol'];
 var signal = Mcore.signal;
 var check_arg = Mcore['check-arg'];
 var call_with_error_handlers = Mcore['call-with-error-handlers'];
+var eval_ = Meval.eval;
 
 var Qend_of_stream = intern('end-of-stream');
 var Qfile_error = intern('file-error');
@@ -29,13 +30,13 @@ function load(filename, environment) {
     var stream = new InputString(buffer.toString());
     var finished = false;
     var form;
-    var reader = function() {form = Mread.read(stream);}
+    var reader = function() {form = Mread.read(stream);};
     var handlers = cons(Qend_of_stream, function (err) {finished = true;});
     while (!finished) {
       form = undefined;
       call_with_error_handlers(reader, handlers);
       if (form !== undefined) {
-        Meval.eval(form, environment);
+        eval_(form, environment);
       }
     }
   } catch (err) {

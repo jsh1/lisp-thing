@@ -6,6 +6,7 @@ var Mcore = require('./core.js');
 var Mthrow = require('./throw.js');
 
 var symbolp = Mcore['symbol?'];
+var keywordp = Mcore['keyword?'];
 var string_to_symbol = Mcore['string->symbol'];
 var symbol_to_string = Mcore['symbol->string'];
 var pairp = Mcore['pair?'];
@@ -18,6 +19,7 @@ var caddr = Mcore.caddr;
 var cdddr = Mcore.cdddr;
 var list = Mcore.list;
 var apply = Mcore.apply;
+var not = Mcore.not;
 var signal = Mthrow.signal;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
 var call_with_error_handlers = Mthrow['call-with-error-handlers'];
@@ -31,10 +33,12 @@ var Qmacro = string_to_symbol('macro');
    would really help. */
 
 function eval_(form, env) {
-  if (symbolp(form)) {
-    return env_ref(env, form);
-  } else if (!pairp(form)) {
-    return form;
+  if (!pairp(form)) {
+    if (symbolp(form) && !keywordp(form)) {
+      return env_ref(env, form);
+    } else {
+      return form;
+    }
   }
 
   var fun = form.car;
@@ -55,7 +59,7 @@ function eval_(form, env) {
       while (pairp(form)) {
         term = form.car;
         value = eval_(car(term), env);
-        if (!false_condition(value)) {
+        if (!not(value)) {
           term = cdr(term);
           if (pairp(term)) {
             return progn(term, env);
@@ -69,12 +73,12 @@ function eval_(form, env) {
     case 'while':
       while (true) {
 	value = eval_(car(form), env);
-	if (false_condition(value)) {
+	if (not(value)) {
 	  return value;
 	}
 	progn(cdr(form), env);
       }
-      /* not reached. */
+      break;
     case 'progn':
       return progn(form, env);
     }
@@ -87,10 +91,6 @@ function eval_(form, env) {
   }
 
   return fun.apply(null, eval_list(form, env));
-}
-
-function false_condition(value) {
-  return value === false || value === null || value === undefined;
 }
 
 // returns an array
@@ -179,7 +179,7 @@ function procedure_env(args, argv, env) {
     lst = lst.cdr;
     switch (state) {
     case 0: // required
-      if (symbolp(param)) {
+      if (symbolp(param) && !keywordp(param)) {
         if (param == Qoptional) {
           state = 1;
           continue;
@@ -202,7 +202,7 @@ function procedure_env(args, argv, env) {
       env_define(env, sym, value);
       continue;
     case 1: // optional
-      if (symbolp(param)) {
+      if (symbolp(param) && !keywordp(param)) {
         if (param == Qoptional) {
           signal_invalid_lambda(args, param);
         } else if (param == Qkey) {
@@ -215,7 +215,7 @@ function procedure_env(args, argv, env) {
           sym = param;
           value = argv_i < argv.length ? argv[argv_i++] : null;
         }
-      } else if (symbolp(car(param))) {
+      } else if (symbolp(car(param)) && !keywordp(car(param))) {
         sym = car(param);
         if (argv_i < argv.length) {
           value = argv[argv_i++];
@@ -225,10 +225,10 @@ function procedure_env(args, argv, env) {
       } else {
         signal_invalid_lambda(args, param);
       }
-      env_define(env, param, value);
+      env_define(env, sym, value);
       continue;
     case 2: // key
-      if (symbolp(param)) {
+      if (symbolp(param) && !keywordp(param)) {
         if (param == Qoptional || param == Qkey) {
           signal_invalid_lambda(args, param);
         } else if (param == Qrest) {
@@ -238,7 +238,7 @@ function procedure_env(args, argv, env) {
           sym = param;
           def = null;
         }
-      } else if (symbolp(car(param))) {
+      } else if (symbolp(car(param)) && !keywordp(car(param))) {
         sym = car(param);
         def = cadr(param);
       } else {
@@ -247,23 +247,24 @@ function procedure_env(args, argv, env) {
       if (keywords === null) {
         keywords = {};
       }
-      var key_sym = string_to_symbol('#:' + symbol_to_string(sym));
       for (j = argv_i; j < argv.length - 1; j++) {
         if (keywords[j]) {
           continue;
         }
-        if (argv[j] == key_sym) {
+        if (keywordp(argv[j]) && argv[j].sym === sym.sym) {
+          env_define(env, sym, argv[j+1]);
           keywords[j] = true;
           keywords[j+1] = true;
-          env_define(env, sym, argv[j+1]);
-          continue;
+          break;
         }
       }
-      value = def === null ? null : eval_(def, env);
-      env_define(env, param, value);
+      if (j === argv.length - 1) {
+        value = def === null ? null : eval_(def, env);
+        env_define(env, sym, value);
+      }
       continue;
     case 3: // rest
-      if (symbolp(param)) {
+      if (symbolp(param) && !keywordp(param)) {
         rest = null;
         for (j = argv.length - 1; j >= argv_i; j--) {
           if (keywords && keywords[j]) {

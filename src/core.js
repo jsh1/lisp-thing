@@ -7,6 +7,7 @@ var modules = [
   require('./cons.js'),
   require('./equality.js'),
   require('./list.js'),
+  require('./object.js'),
   require('./number.js'),
   require('./sequence.js'),
   require('./string.js'),

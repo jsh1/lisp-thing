@@ -1,4 +1,4 @@
-// Copyright (c) 2015 John Harper. All rights reserved.
+;; Copyright (c) 2015 John Harper. All rights reserved.
 
 ;; Syntactic expansions
 

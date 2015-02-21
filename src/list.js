@@ -14,6 +14,7 @@ var cdr = Mcons.cdr;
 var listp = Mcons['list?'];
 var positive_integer_p = Mnumber['positive-integer?'];
 var equal = Mequality['equal?'];
+var not = Mequality.not;
 var check_arg = Mthrow['check-arg'];
 
 function make_list(len, value) {
@@ -260,6 +261,48 @@ function for_each(f, lst) {
   }
 }
 
+function filter(f, lst) {
+  check_arg(lst, listp);
+  var ret = null;
+  var tail = null;
+  var value, i;
+  if (arguments.length === 2) {
+    while (pairp(lst)) {
+      if (!not(f(lst.car))) {
+        if (tail) {
+          tail = tail.cdr = cons(value, null);
+        } else {
+          tail = ret = cons(value, null);
+        }
+      }
+      lst = lst.cdr;
+    }
+  } else {
+    var argv = [lst];
+    for (i = 2; i < arguments.length; i++) {
+      argv.push(arguments[i]);
+    }
+    while (pairp(lst)) {
+      var argvv = [lst.car];
+      lst = lst.cdr;
+      for (i = 2; i < arguments.length; i++) {
+        var arg = argv[i-2];
+        check_arg(arg, pairp);
+        argvv.push(arg.car);
+        argv[i-2] = arg.cdr;
+      }
+      if (!not(f.apply(null, argvv))) {
+        if (tail) {
+          tail = tail.cdr = cons(value, null);
+        } else {
+          tail = ret = cons(value, null);
+        }
+      }
+    }
+  }
+  return ret;
+}
+
 module.exports = {
   'make-list': make_list,
   append: append,
@@ -275,5 +318,6 @@ module.exports = {
   assoc: assoc,
   apply: apply,
   'for-each': for_each,
-  map: map
+  map: map,
+  filter: filter
 };
