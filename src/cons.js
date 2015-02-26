@@ -157,6 +157,8 @@ function list_star() {
 }
 
 module.exports = {
+  nil: null,
+  t: true,
   'pair?': pairp,
   cons: cons,
   car: car,

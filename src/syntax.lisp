@@ -16,6 +16,14 @@
 	       (if (pair? x) (cons 'progn (cdr x)) ()))
 	     bindings)))
 
+(define-macro (let* . args)
+  (let ((rest (reverse (car args)))
+	(body (cons 'progn (cdr args))))
+    (while (pair? rest)
+      (set! body (list 'let (list (car rest)) body))
+      (set! rest (cdr rest)))
+    body))
+
 (define-macro (letrec bindings . body)
   ((lambda (vars setters)
      (list* 'let vars (nconc setters body)))
@@ -53,14 +61,6 @@
 	(set! rest (cdr rest)))
       body)))
 
-(define-macro (let* . args)
-  (let ((rest (reverse (car args)))
-	(body (cons 'progn (cdr args))))
-    (while (pair? rest)
-      (set! body (list 'let (list (car rest)) body))
-      (set! rest (cdr rest)))
-    body))
-
 (define-macro (do vars test . body)
   (list 'let (map (lambda (x) (list (car x) (cadr x))) vars)
 	(list* 'while (list 'not (car test))
@@ -82,7 +82,8 @@
 	 (list 'lambda '() form)
 	 (map (lambda (h)
 		(list 'cons (list 'quote (car h))
-		      (list* 'lambda (if (symbol? var) (list var) ()) (cdr h))))
+		      (list* 'lambda (if (symbol? var) (list var) ())
+			     (cdr h))))
 	      handlers)))
 
 (define-macro (begin . forms)

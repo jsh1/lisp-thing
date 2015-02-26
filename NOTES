@@ -1,0 +1,51 @@
+
+# Special Forms
+
+	(quote VALUE) => VALUE
+	(lambda ARG-LIST BODY...) => PROCEDURE
+	(define SYMBOL VALUE)
+	(set! SYMBOL VALUE)
+	(progn FORM-1 ... FORM-N) => result of evaluating FORM-N
+	(cond (VALUE BODY...) ...) => VALUE or BODY
+	(while CONDITION BODY...)
+
+Chose to make `while` the only looping primitive, no tail recursion for
+now (this stings, but Javascript doesn't implement it yet, and
+efficiency / interop. goals require native support).
+
+ARG-LIST is traditional `(ARG1 ARG2 ... [. REST])` with the addition of
+`#!optional`, `#!keyword` and `#!rest`. All non-required parameters may
+have default values as the second element of a list, with the symbol as
+the first, e.g. `(lambda (#!optional (a 1)) ...)`.
+
+# Conditionals
+
+The only false values are `#f` (JS `false`), `()` (JS `null`) and JS
+`undefined` (which has no Lisp syntax).
+
+`nil` is available as a global binding to `()` as a convenience.
+Similarly `t` is bound to `#t`.
+
+# Non-Local Exits and Exceptions
+
+Using Javascript `throw` and `try ... catch` to implement non-local
+control flow. Going old school:
+
+	(throw TAG VALUE)
+	(catch TAG BODY...)
+
+	(signal LIST)		-- (ERROR-SYMBOL ERROR-DATA...)
+	(condition-case [VAR]
+	    FORM
+	  HANDLER-1 ... HANDLER-N)
+
+where each HANDLER is either `(ERROR-SYMBOL BODY...)` or `((ERROR-1 ...
+ERROR-N) BODY...)`. The special symbol `error` matches any error
+condition. If VAR is non-null it's a symbol to be bound to the `LIST`
+given to `signal`.
+
+# Object Read Syntax
+
+	{KEY-1 VALUE-1 ... KEY-N VALUE-N}	-- JS object
+
+KEYs may be symbols (or keywords), strings or characters. Not numbers.

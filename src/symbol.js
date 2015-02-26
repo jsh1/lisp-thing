@@ -17,7 +17,7 @@ LispSymbol.prototype.toString = function() {
   return this.sym;
 };
 
-function sym_print(print, stream, level, opts) {
+LispSymbol.prototype.print = function(print, stream, level, opts) {
   if (opts.hasOwnProperty('readable') && !opts.readable) {
     stream.puts(this.sym);
     return;
@@ -81,10 +81,7 @@ function sym_print(print, stream, level, opts) {
 
     stream.putc(c);
   }
-}
-
-LispSymbol.prototype.print = sym_print;
-LispSymbol.prototype.print = sym_print;
+};
 
 function symbolp(a) {
   return a instanceof LispSymbol;

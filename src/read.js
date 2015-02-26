@@ -2,16 +2,20 @@
 
 'use strict';
 
+var Mchar = require('./char.js');
 var Mcons = require('./cons.js');
+var Mstring = require('./string.js');
 var Msymbol = require('./symbol.js');
 var Mchar = require('./char.js');
 var Mthrow = require('./throw.js');
 
+var charp = Mchar['char?'];
 var cons = Mcons.cons;
 var list = Mcons.list;
 var symbolp = Msymbol['symbol?'];
 var string_to_symbol = Msymbol['string->symbol'];
 var string_to_keyword = Msymbol['string->keyword'];
+var stringp = Mstring['string?'];
 var integer_to_char = Mchar['integer->char'];
 var signal = Mthrow.signal;
 
@@ -56,6 +60,8 @@ function read_form(stream, nested) {
       return cons(c === 64 ? Qbackquote_splice : Qbackquote_unquote, form);
     case 91: // '['
       return read_vector(stream, 93);
+    case 123: // '{'
+      return read_object(stream);
     case 34: // '"'
       return read_string(stream);
     case 35: // '#'
@@ -176,6 +182,26 @@ function read_vector(stream, terminator) {
     }
     stream.ungetc();
     array.push(read_form(stream, true));
+  }
+  // not reached
+}
+
+function read_object(stream) {
+  var obj = {};
+  while (true) {
+    var c = skip_whitespace(stream)|0;
+    if (c === -1) {
+      signal_end_of_stream(stream, true);
+    } else if (c === 125) { // '\}'
+      return obj;
+    }
+    stream.ungetc();
+    var key = read_form(stream, true);
+    if (!stringp(key) && !symbolp(key) && !charp(key)) {
+      signal_read_syntax(stream);
+    }
+    var value = read_form(stream, true);
+    obj[key] = value;
   }
   // not reached
 }
@@ -366,7 +392,7 @@ function read_atom(stream, c, allow_number, intern) {
       if (radix === 0 && buffer.length > 0) {
         stream.ungetc();
         return finish_atom(stream, buffer, ifirst, rational,
-                           radix, exact, sign, inter);
+                           radix, exact, sign, intern);
       }
       /* falls through */
     default:
