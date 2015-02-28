@@ -25,22 +25,23 @@ var Qfile_error = intern('file-error');
 
 function load(filename, environment) {
   check_arg(filename, Mcore['string?']);
+  var buffer;
   try {
-    var buffer = fs.readFileSync(filename);
-    var stream = new InputString(buffer.toString());
-    var finished = false;
-    var form;
-    var reader = function() {form = Mread.read(stream);};
-    var handlers = cons(Qend_of_stream, function (err) {finished = true;});
-    while (!finished) {
-      form = undefined;
-      call_with_error_handlers(reader, handlers);
-      if (form !== undefined) {
-        eval_(form, environment);
-      }
-    }
+    buffer = fs.readFileSync(filename);
   } catch (err) {
     signal(list(Qfile_error, "No such file", filename));
+  }
+  var stream = new InputString(buffer.toString());
+  var finished = false;
+  var form;
+  var reader = function() {form = Mread.read(stream);};
+  var handler = cons(Qend_of_stream, function (err) {finished = true;});
+  while (!finished) {
+    form = undefined;
+    call_with_error_handlers(reader, handler);
+    if (form !== undefined) {
+      eval_(form, environment);
+    }
   }
 }
 

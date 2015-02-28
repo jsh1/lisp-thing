@@ -218,10 +218,10 @@ function map(f, lst) {
       var argvv = [lst.car];
       lst = lst.cdr;
       for (i = 2; i < arguments.length; i++) {
-        var arg = argv[i-2];
+        var arg = argv[i-1];
         check_arg(arg, pairp);
         argvv.push(arg.car);
-        argv[i-2] = arg.cdr;
+        argv[i-1] = arg.cdr;
       }
       value = f.apply(null, argvv);
       if (tail) {
@@ -251,10 +251,10 @@ function for_each(f, lst) {
       var argvv = [lst.car];
       lst = lst.cdr;
       for (i = 2; i < arguments.length; i++) {
-        var arg = argv[i-2];
+        var arg = argv[i-1];
         check_arg(arg, pairp);
         argvv.push(arg.car);
-        argv[i-2] = arg.cdr;
+        argv[i-1] = arg.cdr;
       }
       f(lst.car);
     }
@@ -286,10 +286,10 @@ function filter(f, lst) {
       var argvv = [lst.car];
       lst = lst.cdr;
       for (i = 2; i < arguments.length; i++) {
-        var arg = argv[i-2];
+        var arg = argv[i-1];
         check_arg(arg, pairp);
         argvv.push(arg.car);
-        argv[i-2] = arg.cdr;
+        argv[i-1] = arg.cdr;
       }
       if (!not(f.apply(null, argvv))) {
         if (tail) {

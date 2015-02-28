@@ -13,20 +13,25 @@ var pairp = Mcore['pair?'];
 var cons = Mcore.cons;
 var car = Mcore.car;
 var cdr = Mcore.cdr;
+var caar = Mcore.caar;
+var cdar = Mcore.cdar;
 var cadr = Mcore.cadr;
 var cddr = Mcore.cddr;
 var caddr = Mcore.caddr;
 var cdddr = Mcore.cdddr;
 var list = Mcore.list;
+var list_ = Mcore['list*'];
 var apply = Mcore.apply;
 var not = Mcore.not;
 var signal = Mthrow.signal;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
 var call_with_error_handlers = Mthrow['call-with-error-handlers'];
 
+var Qlambda = string_to_symbol('lambda');
+var Qmacro = string_to_symbol('macro');
+
 var Qinvalid_lambda = string_to_symbol('invalid-lambda');
 var Qunbound_variable = string_to_symbol('unbound-variable');
-var Qmacro = string_to_symbol('macro');
 
 /* Leaving tail call elimination to the mercy of the host interpreter.
    Javascript will catch up eventually, none of the hacks we could do
@@ -48,6 +53,10 @@ function eval_(form, env) {
     var value, term;
     switch (fun.sym) {
     case 'define':
+      // (define (X . ARGS) . BODY) => (define X (lambda ARGS . BODY))
+      while (pairp(car(form))) {
+        form = list(caar(form), list_(Qlambda, cdar(form), cdr(form)));
+      }
       return env_define(env, car(form), eval_(cadr(form), env));
     case 'set!':
       return env_set(env, car(form), eval_(cadr(form), env));
@@ -137,6 +146,7 @@ function env_set(env, sym, value) {
       map[sym.sym] = value;
       return;
     }
+    env = env.cdr;
   }
   signal(list(Qunbound_variable, sym));
 }

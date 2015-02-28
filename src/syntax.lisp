@@ -3,18 +3,32 @@
 ;; Syntactic expansions
 
 (define define-macro
-  (cons 'macro (lambda (args . def)
-		 (list 'define (car args)
-		       (list 'cons ''macro (list* 'lambda (cdr args) def))))))
+  (cons 'macro (lambda form
+		 (while (pair? (car form))
+		   (set! form (list (caar form)
+				    (list* 'lambda (cdar form) (cdr form)))))
+		 (list 'define (car form)
+		       (list* 'cons ''macro (cdr form))))))
 
-(define-macro (let bindings . body)
-  (cons (list* 'lambda
+(define-macro (let arg . rest)
+  (cond ((list? arg)
+	 (cons (list* 'lambda
+		      (map (lambda (x)
+			     (if (pair? x) (car x) x)) arg)
+		      rest)
 	       (map (lambda (x)
-		      (if (pair? x) (car x) x)) bindings)
-	       body)
-	(map (lambda (x)
-	       (if (pair? x) (cons 'progn (cdr x)) ()))
-	     bindings)))
+		      (if (pair? x) (cons 'progn (cdr x)) ()))
+		    arg)))
+	(#t
+	 ;; named let
+	 (list 'letrec
+	       (list (list arg (list* 'lambda
+				      (map (lambda (x)
+					     (if (pair? x) (car x) x))
+					   (car rest)) (cdr rest))))
+	       (cons arg (map (lambda (x)
+				(if (pair? x) (cons 'progn (cdr x)) ()))
+			      (car rest)))))))
 
 (define-macro (let* . args)
   (let ((rest (reverse (car args)))

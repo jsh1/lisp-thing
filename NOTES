@@ -2,21 +2,44 @@
 # Special Forms
 
 	(quote VALUE) => VALUE
-	(lambda ARG-LIST BODY...) => PROCEDURE
+	(lambda ARGS . BODY) => PROCEDURE
 	(define SYMBOL VALUE)
+	(define (X . ARGS) . BODY) => (define X (lambda ARGS . BODY))
 	(set! SYMBOL VALUE)
 	(progn FORM-1 ... FORM-N) => result of evaluating FORM-N
-	(cond (VALUE BODY...) ...) => VALUE or BODY
-	(while CONDITION BODY...)
+	(cond (VALUE . BODY) ...) => VALUE or BODY
+	(while CONDITION . BODY)
 
-Chose to make `while` the only looping primitive, no tail recursion for
-now (this stings, but Javascript doesn't implement it yet, and
-efficiency / interop. goals require native support).
+Chose to make `while` the only looping primitive, can't use tail
+recursion for now (this stings, but Javascript doesn't provide it yet,
+and efficiency / interop. goals require native function calling).
 
-ARG-LIST is traditional `(ARG1 ARG2 ... [. REST])` with the addition of
-`#!optional`, `#!keyword` and `#!rest`. All non-required parameters may
-have default values as the second element of a list, with the symbol as
-the first, e.g. `(lambda (#!optional (a 1)) ...)`.
+Lambda ARGS is traditional `(ARG1 ARG2 ... [. REST])` with the addition
+of `#!optional`, `#!keyword` and `#!rest`. All non-required parameters
+may have default values as the second element of a list, with the
+symbol as the first, e.g. `(lambda (#!optional (a 1)) ...)`.
+
+Note that `define` has a recursive definition, e.g.: `(define ((x y) z)
+(+ y z))` is legal.
+
+# Standard Macros
+
+	(define-macro SYMBOL VALUE)
+	(define-macro (X . ARGS) ...) => (define-macro X (lambda ARGS ...))
+	(let VARS . BODY)
+	(let SYM VARS . BODY)
+	(let* VARS . BODY)
+	(letrec VARS . BODY)
+	(if CONDITION TRUE-FORM . ELSE-FORMS)
+	(when CONDITION . BODY)
+	(unless CONDITION . BODY)
+	(or . FORMS)
+	(and . FORMS)
+	(do VARS TEST . BODY)
+	(catch TAG . BODY)
+	(unwind-protect FORM . BODY)
+	(condition-case VAR FORM . HANDLERS)
+	(begin . BODY)
 
 # Conditionals
 
@@ -35,7 +58,7 @@ control flow. Going old school:
 	(catch TAG BODY...)
 
 	(signal LIST)		-- (ERROR-SYMBOL ERROR-DATA...)
-	(condition-case [VAR]
+	(condition-case VAR
 	    FORM
 	  HANDLER-1 ... HANDLER-N)
 
