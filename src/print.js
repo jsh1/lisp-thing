@@ -61,7 +61,7 @@ function print(obj, stream, level, opts) {
     return;
   }
 
-  stream.puts('#<' + obj + '>');
+  stream.puts('#<' + obj.toString() + '>');
 }
 
 function print_vector(vec, stream, level, opts) {

@@ -68,7 +68,7 @@ LispSymbol.prototype.print = function(print, stream, level, opts) {
 
     case 35: // '#'
       // don't escape #!foo
-      if (i != 1 || i === s.length || s[i] !== '!') {
+      if (i !== 1 || i === s.length || s[i] !== '!') {
 	stream.puts('\\');
       }
       break;

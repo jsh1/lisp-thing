@@ -4,6 +4,7 @@
 
 var Mcore = require('./core.js');
 var Mthrow = require('./throw.js');
+var Mmacro = require('./macro.js');
 
 var symbolp = Mcore['symbol?'];
 var keywordp = Mcore['keyword?'];
@@ -23,6 +24,8 @@ var list = Mcore.list;
 var list_ = Mcore['list*'];
 var apply = Mcore.apply;
 var not = Mcore.not;
+var macrop = Mmacro['macro?'];
+var macro_function = Mmacro['macro-function'];
 var signal = Mthrow.signal;
 var signal_missing_arg = Mthrow['signal-missing-arg'];
 var call_with_error_handlers = Mthrow['call-with-error-handlers'];
@@ -95,8 +98,8 @@ function eval_(form, env) {
 
   fun = eval_(fun, env);
 
-  if (pairp(fun) && fun.car == Qmacro) {
-    return eval_(apply(fun.cdr, form), env);
+  if (macrop(fun)) {
+    return eval_(apply(macro_function(fun), form), env);
   }
 
   return fun.apply(null, eval_list(form, env));
@@ -166,10 +169,10 @@ function env_define(env, sym, value) {
    (for small numbers of required arguments). */
 
 function make_procedure(args, body, env) {
-  function apply_lambda() {
+  function LispProcedure() {
     return progn(body, procedure_env(args, arguments, env));
   }
-  return apply_lambda;
+  return LispProcedure;
 }
 
 var Qoptional = string_to_symbol('#!optional');
@@ -190,13 +193,13 @@ function procedure_env(args, argv, env) {
     switch (state) {
     case 0: // required
       if (symbolp(param) && !keywordp(param)) {
-        if (param == Qoptional) {
+        if (param === Qoptional) {
           state = 1;
           continue;
-        } else if (param == Qkey) {
+        } else if (param === Qkey) {
           state = 2;
           continue;
-        } else if (param == Qrest) {
+        } else if (param === Qrest) {
           state = 3;
           continue;
         } else {
@@ -213,12 +216,12 @@ function procedure_env(args, argv, env) {
       continue;
     case 1: // optional
       if (symbolp(param) && !keywordp(param)) {
-        if (param == Qoptional) {
+        if (param === Qoptional) {
           signal_invalid_lambda(args, param);
-        } else if (param == Qkey) {
+        } else if (param === Qkey) {
           state = 2;
           continue;
-        } else if (param == Qrest) {
+        } else if (param === Qrest) {
           state = 3;
           continue;
         } else {
@@ -239,9 +242,9 @@ function procedure_env(args, argv, env) {
       continue;
     case 2: // key
       if (symbolp(param) && !keywordp(param)) {
-        if (param == Qoptional || param == Qkey) {
+        if (param === Qoptional || param === Qkey) {
           signal_invalid_lambda(args, param);
-        } else if (param == Qrest) {
+        } else if (param === Qrest) {
           state = 3;
           continue;
         } else {

@@ -3,12 +3,13 @@
 ;; Syntactic expansions
 
 (define define-macro
-  (cons 'macro (lambda form
-		 (while (pair? (car form))
-		   (set! form (list (caar form)
-				    (list* 'lambda (cdar form) (cdr form)))))
-		 (list 'define (car form)
-		       (list* 'cons ''macro (cdr form))))))
+  (make-macro (lambda form
+		(while (pair? (car form))
+		  (set! form (list (caar form)
+				   (list* 'lambda (cdar form) (cdr form)))))
+		(list 'define (car form)
+		      (list 'make-macro (cadr form) (list 'quote (car form)))))
+	      'define-macro))
 
 (define-macro (let arg . rest)
   (cond ((list? arg)
