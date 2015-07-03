@@ -1,3 +1,5 @@
+#!/usr/local/bin/node
+
 // Copyright (c) 2015 John Harper. All rights reserved.
 
 'use strict';

@@ -1,0 +1,15 @@
+{
+  "name": "lisp-thing",
+  "version": "0.0.1",
+  "description": "Unfinished toy Lisp implementation.",
+  "keywords": ["lisp", "scheme", "interpreter"],
+  "license": "MIT",
+  "main": "src/core.js",
+  "bin": {
+    "lisp-thing": "src/repl.js"
+  },
+  "repository": {
+    "type": "git",
+    "github": "jsh1/lisp-thing"
+  }
+}

@@ -72,3 +72,16 @@ given to `signal`.
 	{KEY-1 VALUE-1 ... KEY-N VALUE-N}	-- JS object
 
 KEYs may be symbols (or keywords), strings or characters. Not numbers.
+
+# Repl
+
+	$ node src/repl.js
+
+then to load the standard macros:
+
+	lisp> (load "src/syntax.scm" environment)
+
+# Compiler
+
+Is unimplemented. This was going to be the whole point, but I got
+distracted before starting it.

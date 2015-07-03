@@ -3,7 +3,6 @@
 'use strict';
 
 var Mequality = require('./equality.js');
-var Mthrow = require('./throw.js');
 
 var equal = Mequality['equal?'];
 var check_arg, signal_invalid_arg;
