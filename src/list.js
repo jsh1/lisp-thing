@@ -21,7 +21,7 @@ function make_list(len, value) {
   check_arg(len, positive_integer_p);
   var lst = null;
   for (var i = 0; i < len; i++) {
-    lst = cons(lst, value || null);
+    lst = cons(value || null, lst);
   }
   return lst;
 }
